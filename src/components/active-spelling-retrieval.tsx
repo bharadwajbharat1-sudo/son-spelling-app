@@ -64,7 +64,7 @@ export function ActiveSpellingRetrieval() {
   const fetchSentenceFromBackend = useCallback(
     async (
       previousSentence: string | undefined,
-      nextMode: "sentence" | "paragraph",
+      nextMode: "word" | "sentence" | "paragraph", // Add "word" here too!
       nextLevel: number,
     ): Promise<string> => {
     const extractSentence = (data: unknown): string => {
@@ -156,7 +156,7 @@ let response = await fetch(
   }
 
   async function fetchNewSentence(
-    nextMode: "sentence" | "paragraph" = mode,
+    nextMode: "word" | "sentence" | "paragraph" = mode,
     nextLevel: number = level,
   ) {
     const previousSentence = sentence
