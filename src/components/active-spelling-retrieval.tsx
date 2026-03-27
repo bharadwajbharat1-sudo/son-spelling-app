@@ -476,7 +476,7 @@ let response = await fetch(
                 Corrections: {correctionsCount} | Time: {timeTakenSec ?? 0}s
               </p>
               <div className="flex justify-center">
-                <Button type="button" onClick={fetchNewSentence} className="font-bold">
+              <Button type="button" onClick={() => fetchNewSentence()} className="font-bold">
                   Next Sentence
                 </Button>
               </div>
