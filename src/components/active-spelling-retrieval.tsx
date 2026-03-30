@@ -2,9 +2,6 @@
 
 import React, { useState } from 'react';
 
-// This is a DEFAULT export, so you import it in page.tsx as: 
-// import ActiveSpellingRetrieval from "@/components/active-spelling-retrieval";
-
 export default function ActiveSpellingRetrieval() {
   const [mode, setMode] = useState('sentence');
   const [level, setLevel] = useState(1);
@@ -15,12 +12,19 @@ export default function ActiveSpellingRetrieval() {
   const [agentMessage, setAgentMessage] = useState("Ready for a mission? What should we write about?");
   const [loading, setLoading] = useState(false);
 
+  const speak = (text: string, slow: boolean = false) => {
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = slow ? 0.5 : 0.9; // 0.5 is nice and slow for spelling
+    utterance.pitch = 1;
+    window.speechSynthesis.speak(utterance);
+  };
+
   const fetchContent = async () => {
     setLoading(true);
     setAgentMessage("🚀 Consulting the AI archives for your mission...");
     
     try {
-      // Replace with your actual Render URL
       const backendUrl = "https://son-spelling-backend.onrender.com";
       const res = await fetch(`${backendUrl}/generate?mode=${mode}&level=${level}&topic=${encodeURIComponent(topic || 'Science')}`);
       
@@ -29,14 +33,8 @@ export default function ActiveSpellingRetrieval() {
       const data = await res.json();
       setTargetText(data.text);
       setPhase('study');
-      setAgentMessage("👀 Study this carefully! It disappears in 7 seconds.");
+      setAgentMessage("👀 Study and Listen! Click 'Start' when you are ready to type.");
       setLoading(false);
-
-      // Give him 7 seconds to memorize
-      setTimeout(() => {
-        setPhase('typing');
-        setAgentMessage("✍️ Mission Start! Type exactly what you saw.");
-      }, 7000);
       
     } catch (err) {
       setLoading(false);
@@ -51,14 +49,13 @@ export default function ActiveSpellingRetrieval() {
       setPhase('feedback');
       setAgentMessage("🏆 MISSION ACCOMPLISHED! Your spelling is flawless.");
     } else {
-      // Find the first mismatched word to give a helpful hint
       const targetWords = targetText.split(' ');
       const userWords = userInput.split(' ');
       let firstErrorIndex = targetWords.findIndex(
         (w, i) => w.toLowerCase() !== (userWords[i] || "").toLowerCase()
       );
       
-      setAgentMessage(`🤔 Almost! Check word #${firstErrorIndex + 1}. Take a look and try again.`);
+      setAgentMessage(`🤔 Almost! Check word #${firstErrorIndex + 1}. Try listening again.`);
     }
   };
 
@@ -75,7 +72,7 @@ export default function ActiveSpellingRetrieval() {
           </div>
         </div>
 
-        {/* The "Agent" Speech Bubble */}
+        {/* Agent Speech Bubble */}
         <div className="p-6">
           <div className="bg-amber-50 border-2 border-amber-200 p-4 rounded-2xl relative shadow-sm">
             <p className="text-amber-900 font-medium italic">"{agentMessage}"</p>
@@ -104,7 +101,7 @@ export default function ActiveSpellingRetrieval() {
                 <input 
                   value={topic}
                   onChange={(e) => setTopic(e.target.value)}
-                  placeholder="e.g. Real Madrid, Space, Dinosaurs..."
+                  placeholder="e.g. Liverpool FC, Space, Coding..."
                   className="w-full p-4 text-lg border-2 border-slate-200 rounded-2xl focus:border-indigo-500 outline-none transition shadow-inner"
                 />
               </div>
@@ -121,20 +118,62 @@ export default function ActiveSpellingRetrieval() {
 
           {/* PHASE 2: STUDY */}
           {phase === 'study' && (
-            <div className="p-10 bg-indigo-900 text-white rounded-3xl text-3xl font-mono leading-relaxed shadow-2xl text-center border-4 border-indigo-400">
-              {targetText}
+            <div className="space-y-6 animate-in fade-in">
+              <div className="p-10 bg-indigo-900 text-white rounded-3xl text-3xl font-mono leading-relaxed shadow-2xl text-center border-4 border-indigo-400">
+                {targetText}
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <button 
+                  onClick={() => speak(targetText)}
+                  className="py-4 bg-white border-2 border-indigo-600 text-indigo-600 rounded-2xl font-bold text-lg hover:bg-indigo-50 transition active:scale-95 flex items-center justify-center gap-2"
+                >
+                  🔊 Read Aloud
+                </button>
+                <button 
+                  onClick={() => speak(targetText, true)}
+                  className="py-4 bg-white border-2 border-amber-500 text-amber-600 rounded-2xl font-bold text-lg hover:bg-amber-50 transition active:scale-95 flex items-center justify-center gap-2"
+                >
+                  🐢 Slow Mode
+                </button>
+              </div>
+
+              <button 
+                onClick={() => {
+                  setPhase('typing');
+                  setAgentMessage("✍️ Type exactly what you heard!");
+                }}
+                className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold text-xl hover:bg-indigo-700 shadow-lg mt-4"
+              >
+                Start Typing ⌨️
+              </button>
             </div>
           )}
 
           {/* PHASE 3: TYPING */}
           {phase === 'typing' && (
             <div className="space-y-4 animate-in zoom-in-95 duration-300">
+              <div className="flex gap-2 mb-2">
+                <button 
+                  onClick={() => speak(targetText)}
+                  className="flex-1 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-sm font-bold border border-indigo-200"
+                >
+                  🔊 Repeat
+                </button>
+                <button 
+                  onClick={() => speak(targetText, true)}
+                  className="flex-1 py-2 bg-amber-50 text-amber-600 rounded-xl text-sm font-bold border border-amber-200"
+                >
+                  🐢 Slower
+                </button>
+              </div>
+
               <textarea 
                 value={userInput}
                 onChange={(e) => setUserInput(e.target.value)}
                 autoFocus
                 className="w-full p-6 h-40 text-xl border-3 border-indigo-100 rounded-2xl focus:border-indigo-500 outline-none resize-none shadow-inner bg-slate-50"
-                placeholder="Type your answer here..."
+                placeholder="Enter the words here..."
               />
               <button 
                 onClick={checkWork}
@@ -145,7 +184,7 @@ export default function ActiveSpellingRetrieval() {
             </div>
           )}
 
-          {/* PHASE 4: FEEDBACK / VICTORY */}
+          {/* PHASE 4: FEEDBACK */}
           {phase === 'feedback' && (
             <div className="text-center py-10 space-y-8">
               <div className="text-8xl animate-bounce">🥇</div>
@@ -155,6 +194,7 @@ export default function ActiveSpellingRetrieval() {
                   setPhase('setup');
                   setUserInput('');
                   setTargetText('');
+                  setTopic('');
                 }}
                 className="px-10 py-4 bg-indigo-600 text-white rounded-full font-bold text-lg hover:bg-indigo-700 shadow-lg"
               >
