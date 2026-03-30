@@ -12,8 +12,9 @@ export default function ActiveSpellingRetrieval() {
   const [agentMessage, setAgentMessage] = useState("Ready for a mission?");
   const [loading, setLoading] = useState(false);
   const [showHint, setShowHint] = useState(false);
+  const [feedback, setFeedback] = useState<{word: string, status: 'correct' | 'error' | 'missing'}[]>([]);
 
-  const randomTopics = ["Outer Space", "Minecraft", "Soccer Stars", "Robots", "Dinosaurs"];
+  const randomTopics = ["Outer Space", "Minecraft", "Soccer Stars", "Robots", "Formula 1"];
 
   const speak = (text: string, slow: boolean = false) => {
     if (typeof window !== "undefined" && window.speechSynthesis) {
@@ -32,7 +33,7 @@ export default function ActiveSpellingRetrieval() {
       const data = await res.json();
       setTargetText(data.text);
       setPhase('study');
-      setAgentMessage("👀 Study the coordinates! Click 'Start' when ready.");
+      setAgentMessage("👀 Study the words! Click 'Start' when ready.");
       setLoading(false);
     } catch (err) {
       setLoading(false);
@@ -41,42 +42,51 @@ export default function ActiveSpellingRetrieval() {
   };
 
   const checkWork = () => {
-    const target = targetText.trim();
-    const user = userInput.trim();
+    // Clean text: remove punctuation and extra spaces for the comparison
+    const clean = (str: string) => str.toLowerCase().replace(/[^\w\s]/g, '').trim().split(/\s+/);
+    
+    const targetWords = clean(targetText);
+    const userWords = clean(userInput);
+    
+    const results: typeof feedback = [];
+    let allCorrect = true;
 
-    // 1. Perfect Match
-    if (user === target) {
+    targetWords.forEach((word, i) => {
+      if (!userWords[i]) {
+        results.push({ word, status: 'missing' });
+        allCorrect = false;
+      } else if (userWords[i] !== word) {
+        results.push({ word: userWords[i], status: 'error' });
+        allCorrect = false;
+      } else {
+        results.push({ word, status: 'correct' });
+      }
+    });
+
+    setFeedback(results);
+
+    if (allCorrect) {
       setPhase('feedback');
-      setAgentMessage("🏆 MISSION ACCOMPLISHED! Perfect spelling and punctuation.");
-      return;
-    }
-
-    // 2. Check for Case/Punctuation only
-    if (user.toLowerCase().replace(/[^\w\s]/g, '') === target.toLowerCase().replace(/[^\w\s]/g, '')) {
-      setAgentMessage("⚠️ Almost! The words are right, but check your Capital Letters or Punctuation (. , !).");
-      return;
-    }
-
-    // 3. Word Count Check
-    const targetWords = target.split(/\s+/);
-    const userWords = user.split(/\s+/);
-
-    if (userWords.length < targetWords.length) {
-      setAgentMessage(`📉 Mission incomplete! You are missing some words. You wrote ${userWords.length} of ${targetWords.length} words.`);
+      setAgentMessage("🏆 MISSION ACCOMPLISHED!");
+      speak("Mission accomplished! Perfect spelling.");
     } else {
-      // 4. Find the first spelling error
-      let firstErrorIndex = targetWords.findIndex((w, i) => w.toLowerCase() !== (userWords[i] || "").toLowerCase());
-      setAgentMessage(`❌ Spelling Error! Check word #${firstErrorIndex + 1}. Try listening to the "Slower" mode.`);
+      const firstMissing = results.find(r => r.status === 'missing');
+      const firstError = results.find(r => r.status === 'error');
+
+      if (firstMissing) {
+        setAgentMessage(`📉 You missed a word: "${firstMissing.word}"`);
+        speak(`You missed the word: ${firstMissing.word}`);
+      } else if (firstError) {
+        setAgentMessage(`❌ Almost! Check your spelling of "${firstError.word}"`);
+        speak(`Check your spelling of ${firstError.word}`);
+      }
     }
   };
 
   const playKeySound = () => {
-    // Mechanical typewriter click sound
     const audio = new Audio('https://www.soundjay.com/communication/typewriter-key-1.mp3');
-    audio.volume = 0.4; // Adjust volume as needed
-    audio.play().catch(() => {
-      // Ignore errors if the browser blocks the first click
-    });
+    audio.volume = 0.2;
+    audio.play().catch(() => {});
   };
 
   return (
@@ -110,7 +120,7 @@ export default function ActiveSpellingRetrieval() {
                 <button onClick={() => speak(targetText)} className="py-4 bg-blue-600 text-white rounded-2xl font-bold">🔊 Read Aloud</button>
                 <button onClick={() => speak(targetText, true)} className="py-4 bg-orange-500 text-white rounded-2xl font-bold">🐢 Slow Mode</button>
               </div>
-              <button onClick={() => setPhase('typing')} className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold text-xl">Start Typing ⌨️</button>
+              <button onClick={() => { setPhase('typing'); setFeedback([]); }} className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold text-xl">Start Typing ⌨️</button>
             </div>
           )}
 
@@ -119,23 +129,27 @@ export default function ActiveSpellingRetrieval() {
               <div className="flex gap-2 mb-2">
                 <button onClick={() => speak(targetText)} className="flex-1 py-3 bg-blue-100 text-blue-700 rounded-xl font-bold">🔊 Repeat</button>
                 <button onClick={() => speak(targetText, true)} className="flex-1 py-3 bg-orange-100 text-orange-700 rounded-xl font-bold">🐢 Slower</button>
-                <button 
-                  onMouseDown={() => setShowHint(true)} 
-                  onMouseUp={() => setShowHint(false)}
-                  onMouseLeave={() => setShowHint(false)}
-                  className="px-4 bg-slate-100 text-slate-600 rounded-xl font-bold border-2 border-slate-200"
-                >
-                  👁️ Peek
-                </button>
+                <button onMouseDown={() => setShowHint(true)} onMouseUp={() => setShowHint(false)} className="px-4 bg-slate-100 text-slate-600 rounded-xl font-bold border-2 border-slate-200">👁️ Peek</button>
               </div>
 
               {showHint && (
-                <div className="p-4 bg-yellow-50 border-2 border-yellow-200 rounded-xl text-yellow-800 font-mono text-center animate-pulse">
+                <div className="p-4 bg-yellow-50 border-2 border-yellow-200 rounded-xl text-yellow-800 font-mono text-center mb-2">
                    {targetText}
                 </div>
               )}
 
-              <textarea value={userInput} onChange={(e) => setUserInput(e.target.value)} onKeyDown={playKeySound} autoFocus className="w-full p-6 h-40 text-xl border-3 border-indigo-100 rounded-2xl outline-none bg-slate-50" placeholder="Type here..." />
+              {/* FEEDBACK HIGHLIGHTER */}
+              {feedback.length > 0 && (
+                <div className="p-4 bg-slate-100 rounded-xl flex flex-wrap gap-2 justify-center border-2 border-slate-200">
+                  {feedback.map((item, i) => (
+                    <span key={i} className={`px-2 py-1 rounded font-bold ${item.status === 'correct' ? 'text-emerald-600' : 'text-rose-600 bg-rose-50 border border-rose-200 animate-pulse'}`}>
+                      {item.word}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              <textarea value={userInput} onKeyDown={playKeySound} onChange={(e) => setUserInput(e.target.value)} autoFocus className="w-full p-6 h-40 text-xl border-3 border-indigo-100 rounded-2xl outline-none bg-slate-50 font-mono" placeholder="Type here..." />
               <button onClick={checkWork} className="w-full py-4 bg-emerald-500 text-white rounded-2xl font-bold text-xl shadow-xl">Verify Coordinates 🎯</button>
             </div>
           )}
@@ -143,7 +157,7 @@ export default function ActiveSpellingRetrieval() {
           {phase === 'feedback' && (
             <div className="text-center py-10 space-y-8">
               <div className="text-8xl animate-bounce">🥇</div>
-              <button onClick={() => { setPhase('setup'); setUserInput(''); setTargetText(''); setTopic(''); }} className="px-10 py-4 bg-indigo-600 text-white rounded-full font-bold text-lg">New Mission</button>
+              <button onClick={() => { setPhase('setup'); setUserInput(''); setTargetText(''); setTopic(''); setFeedback([]); }} className="px-10 py-4 bg-indigo-600 text-white rounded-full font-bold text-lg">New Mission</button>
             </div>
           )}
         </div>
