@@ -21,7 +21,7 @@ export default function ActiveSpellingRetrieval() {
     
     try {
       // Replace with your actual Render URL
-      const backendUrl = "https://son-spelling-api.onrender.com"; 
+      const backendUrl = "https://son-spelling-backend.onrender.com";
       const res = await fetch(`${backendUrl}/generate?mode=${mode}&level=${level}&topic=${encodeURIComponent(topic || 'Science')}`);
       
       if (!res.ok) throw new Error("Backend offline");
