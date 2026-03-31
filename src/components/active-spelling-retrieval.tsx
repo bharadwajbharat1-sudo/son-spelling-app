@@ -52,7 +52,6 @@ export default function ActiveSpellingRetrieval() {
     setUserInput('');
     setFeedback([]);
     
-    // Determine the topic to use
     const currentTopic = isNewTopic 
       ? (topic.trim() || randomTopics[Math.floor(Math.random() * randomTopics.length)]) 
       : activeTopic;
@@ -62,12 +61,16 @@ export default function ActiveSpellingRetrieval() {
     try {
       const res = await fetch(`https://son-spelling-backend.onrender.com/generate?mode=${mode}&level=${level}&topic=${encodeURIComponent(currentTopic)}`);
       const data = await res.json();
+      
+      // SAFETY CHECK: If text is missing, throw error to trigger catch block
+      if (!data.text || data.text.length < 2) throw new Error("Empty mission data");
+
       setTargetText(data.text);
       setPhase('study');
       setLoading(false);
     } catch (err) {
       setLoading(false);
-      setAgentMessage("The base is down, Mick!");
+      setAgentMessage("The base is down, Mick! Try hitting 'Launch' again.");
     }
   };
 
@@ -127,14 +130,14 @@ export default function ActiveSpellingRetrieval() {
       {/* MAIN WORKSPACE */}
       <div className="max-w-6xl mx-auto bg-white shadow-2xl rounded-[40px] flex flex-col min-h-[600px] border-4 border-white">
         <div className="bg-rose-700 p-4 text-white flex justify-between items-center px-10">
-          <span className="font-black italic text-2xl tracking-tighter">ROCKY SPELLING CAMP</span>
-          {activeTopic && <span className="text-xs font-bold bg-rose-800 px-3 py-1 rounded-full">Topic: {activeTopic}</span>}
+          <span className="font-black italic text-2xl tracking-tighter uppercase">ROCKY SPELLING CAMP</span>
+          {activeTopic && <span className="text-xs font-bold bg-rose-800 px-3 py-1 rounded-full uppercase">Topic: {activeTopic}</span>}
         </div>
 
         <div className="p-10 flex-grow flex flex-col">
           {phase === 'setup' && (
             <div className="max-w-xl mx-auto w-full space-y-8 py-10">
-              <input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="Topic (e.g. Training)" className="w-full p-8 text-3xl border-4 border-slate-100 rounded-[30px] font-black outline-none focus:border-rose-500" />
+              <input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="Topic (e.g. Football)" className="w-full p-8 text-3xl border-4 border-slate-100 rounded-[30px] font-black outline-none focus:border-rose-500" />
               <button onClick={() => fetchContent(true)} disabled={loading} className="w-full py-8 bg-rose-600 text-white rounded-[30px] font-black text-4xl shadow-2xl">
                 {loading ? "DATA RETRIEVAL..." : "RING THE BELL 🔔"}
               </button>
@@ -143,14 +146,15 @@ export default function ActiveSpellingRetrieval() {
 
           {phase === 'study' && (
             <div className="space-y-10 flex-grow flex flex-col justify-center">
-              <div className="p-16 bg-slate-900 text-white rounded-[50px] text-6xl font-mono text-center border-[12px] border-rose-600 shadow-2xl">
-                {targetText}
+              {/* THE FIX: Added "text-white" and "break-words" to ensure it shows up in the dark box */}
+              <div className="p-16 bg-slate-900 text-white rounded-[50px] text-6xl font-mono text-center border-[12px] border-rose-600 shadow-2xl break-words overflow-hidden">
+                {targetText || "Waitin' for data..."}
               </div>
               <div className="max-w-2xl mx-auto w-full grid grid-cols-2 gap-6">
                 <button onClick={() => rockySpeak(targetText)} className="py-6 bg-blue-700 text-white rounded-3xl font-black text-xl">🔊 READ ALOUD</button>
                 <button onClick={() => rockySpeak(targetText, true)} className="py-6 bg-orange-600 text-white rounded-3xl font-black text-xl">🐢 SLOW MODE</button>
               </div>
-              <button onClick={() => setPhase('typing')} className="max-w-2xl mx-auto w-full py-6 bg-rose-600 text-white rounded-3xl font-black text-2xl">GO THE DISTANCE 🥊</button>
+              <button onClick={() => setPhase('typing')} className="max-w-2xl mx-auto w-full py-6 bg-rose-600 text-white rounded-3xl font-black text-2xl uppercase">GO THE DISTANCE 🥊</button>
             </div>
           )}
 
@@ -182,13 +186,12 @@ export default function ActiveSpellingRetrieval() {
           {phase === 'feedback' && (
             <div className="flex-grow flex flex-col items-center justify-center space-y-12">
               <div className="text-[200px] animate-pulse">🎖️</div>
-              {/* THE FIX: This now triggers fetchContent(false) to stick to the same topic */}
               <button 
                 onClick={() => fetchContent(false)} 
                 disabled={loading}
                 className="px-24 py-10 bg-rose-600 text-white rounded-full font-black text-4xl shadow-2xl hover:scale-105 transition"
               >
-                {loading ? "LOADING NEXT ROUND..." : "NEXT ROUND 🚀"}
+                {loading ? "LOADING..." : "NEXT ROUND 🚀"}
               </button>
             </div>
           )}
