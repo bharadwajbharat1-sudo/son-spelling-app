@@ -20,8 +20,6 @@ export default function ActiveSpellingRetrieval() {
   const startTime = useRef<number | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  const categories = ["Soccer", "Basketball", "Sneakers", "Technology", "Space", "Science", "Geography", "History", "Video Games"];
-
   const rockySpeak = (text: string, slow: boolean = false) => {
     if (typeof window !== "undefined" && window.speechSynthesis) {
       window.speechSynthesis.cancel();
@@ -37,13 +35,15 @@ export default function ActiveSpellingRetrieval() {
     return word.toUpperCase().match(/.{1,3}/g)?.join(' - ') || word.toUpperCase();
   };
 
+  // UPDATED: Ensuring word count is committed before moving rounds
   const fetchContent = async (isNewSession: boolean = false) => {
     setLoading(true);
-    startTime.current = null;
+    startTime.current = null; // Reset WPM timer for the new sentence
     setWpm(0);
     setUserInput('');
     setCorrectionDrills({});
     setShowHint(false);
+    
     const currentTopic = isNewSession ? selectedTopic : activeTopic;
     if (isNewSession) setActiveTopic(currentTopic);
     
@@ -58,6 +58,20 @@ export default function ActiveSpellingRetrieval() {
       alert("System Down, Mick!");
     }
   };
+
+  // UPDATED: WPM calculation logic to be more reactive
+  useEffect(() => {
+    if (phase === 'typing' && userInput.length > 0) {
+      if (!startTime.current) {
+        startTime.current = Date.now();
+      }
+      const timeElapsed = (Date.now() - startTime.current) / 60000; // in minutes
+      const wordCount = userInput.trim().split(/\s+/).length;
+      if (timeElapsed > 0.01) { // Prevent infinity on first keystroke
+        setWpm(Math.round(wordCount / timeElapsed));
+      }
+    }
+  }, [userInput, phase]);
 
   const checkWork = () => {
     const clean = (str: string) => str.toLowerCase().replace(/[^\w\s]/g, '').trim().split(/\s+/);
@@ -78,21 +92,17 @@ export default function ActiveSpellingRetrieval() {
 
     setFeedback(results);
     
+    // ALWAYS update words completed based on how many he got right
+    const correctCount = results.filter(f => f.status === 'correct').length;
+    setWordsCompleted(prev => prev + correctCount);
+
     if (!hasErrors) {
-      setWordsCompleted(prev => prev + targetWords.length);
       setPhase('feedback');
       rockySpeak("Great round! Perfect form.");
     } else {
       setPhase('debrief');
-      setCorrectionDrills({});
       rockySpeak("Check the blueprint. Fix 'em and we move on.");
     }
-  };
-
-  const handlePeek = (e: React.MouseEvent) => {
-    e.preventDefault(); // Prevents losing focus on textarea
-    setShowHint(!showHint);
-    if (inputRef.current) inputRef.current.focus();
   };
 
   return (
@@ -117,7 +127,7 @@ export default function ActiveSpellingRetrieval() {
           {phase === 'setup' && (
             <div className="max-w-xl mx-auto w-full space-y-8 py-10 text-center">
               <select value={selectedTopic} onChange={(e) => setSelectedTopic(e.target.value)} className="w-full p-8 text-3xl border-4 border-slate-100 rounded-[30px] font-black bg-slate-50 focus:border-rose-500 outline-none cursor-pointer">
-                {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                {["Soccer", "Basketball", "Sneakers", "Technology", "Space", "Science", "Geography", "History", "Video Games"].map(cat => <option key={cat} value={cat}>{cat}</option>)}
               </select>
               <button onClick={() => fetchContent(true)} className="w-full py-8 bg-rose-600 text-white rounded-[30px] font-black text-4xl shadow-2xl">RING THE BELL 🔔</button>
             </div>
@@ -134,54 +144,55 @@ export default function ActiveSpellingRetrieval() {
             <div className="flex-grow flex flex-col space-y-6">
               <div className="flex gap-4 justify-center">
                 <button onMouseDown={(e) => { e.preventDefault(); rockySpeak(targetText); }} className="px-10 py-3 bg-blue-100 text-blue-800 rounded-2xl font-black border-2 border-blue-200">🔊 Repeat</button>
-                <button onMouseDown={handlePeek} className={`px-10 py-3 rounded-2xl font-black border-2 transition ${showHint ? 'bg-yellow-400 text-yellow-900 border-yellow-600' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>👁️ Peek</button>
+                {/* PEEK: Only shows while button is held down */}
+                <button 
+                    onMouseDown={(e) => { e.preventDefault(); setShowHint(true); }} 
+                    onMouseUp={() => setShowHint(false)}
+                    onMouseLeave={() => setShowHint(false)}
+                    className="px-10 py-3 rounded-2xl font-black border-2 bg-slate-100 text-slate-500 border-slate-200 active:bg-yellow-400 active:text-yellow-900"
+                >
+                    👁️ Hold to Peek
+                </button>
               </div>
-              {showHint && <div className="text-center text-4xl font-mono text-indigo-600 py-4 font-black bg-yellow-50 rounded-2xl border-2 border-yellow-200">{targetText}</div>}
+              
+              <div className="h-16 flex items-center justify-center">
+                {showHint && <div className="text-center text-4xl font-mono text-indigo-600 font-black bg-yellow-50 px-6 py-2 rounded-2xl border-2 border-yellow-200 animate-pulse">{targetText}</div>}
+              </div>
+
               <textarea 
                 ref={inputRef}
                 value={userInput} 
                 onChange={(e) => setUserInput(e.target.value)} 
                 autoFocus 
-                spellCheck="false"
-                autoComplete="off"
-                autoCorrect="off"
-                autoCapitalize="none"
+                spellCheck="false" autoComplete="off" autoCorrect="off" autoCapitalize="none"
                 className="flex-grow w-full p-12 text-5xl font-mono border-4 border-slate-50 rounded-[50px] outline-none bg-slate-50 resize-none font-black" 
               />
-              <button onClick={checkWork} className="w-full py-8 bg-indigo-600 text-white rounded-[30px] font-black text-4xl shadow-2xl uppercase">Finish Round 🎯</button>
+              <button onClick={checkWork} className="w-full py-8 bg-indigo-600 text-white rounded-[30px] font-black text-4xl shadow-2xl uppercase tracking-tighter">Finish Round 🎯</button>
             </div>
           )}
 
-          {/* PHASE: DEBRIEF - NOW WITH "NEXT ROUND" OPTION */}
           {phase === 'debrief' && (
-            <div className="flex-grow flex flex-col space-y-8 animate-in fade-in">
+            <div className="flex-grow flex flex-col space-y-8">
               <h2 className="text-4xl font-black text-rose-600 text-center uppercase italic">The Blueprint Room</h2>
               <div className="grid grid-cols-1 gap-8">
                 {feedback.filter(f => f.status !== 'correct').map((error, idx) => (
                   <div key={idx} className="bg-slate-50 p-10 rounded-[50px] border-4 border-indigo-100 shadow-xl flex flex-col items-center gap-6">
-                    <div className="text-center">
-                      <p className="text-xs font-black text-slate-400 uppercase tracking-[0.4em] mb-4">Study the Blocks:</p>
-                      <div className="text-6xl md:text-8xl font-mono font-black text-indigo-900 tracking-[0.1em] bg-white px-12 py-8 rounded-[40px] shadow-inner border-2 border-slate-100">
+                    <div className="text-6xl md:text-8xl font-mono font-black text-indigo-900 tracking-[0.1em] bg-white px-12 py-8 rounded-[40px] shadow-inner border-2 border-slate-100 text-center">
                         {getSyllableBreakdown(error.target)}
-                      </div>
                     </div>
-                    <div className="w-full max-w-2xl space-y-4">
-                      <input 
-                        value={correctionDrills[idx] || ""}
-                        onChange={(e) => setCorrectionDrills(prev => ({ ...prev, [idx]: e.target.value }))}
-                        spellCheck="false" autoComplete="off" autoCorrect="off" autoCapitalize="none"
-                        placeholder="Retype correctly..."
-                        className="w-full p-8 border-4 border-indigo-500 rounded-[30px] text-center text-5xl font-mono bg-white shadow-2xl uppercase font-black outline-none"
-                      />
-                    </div>
+                    <input 
+                      value={correctionDrills[idx] || ""}
+                      onChange={(e) => setCorrectionDrills(prev => ({ ...prev, [idx]: e.target.value }))}
+                      spellCheck="false" autoComplete="off" autoCorrect="off" autoCapitalize="none"
+                      className="w-full p-8 border-4 border-indigo-500 rounded-[30px] text-center text-5xl font-mono bg-white shadow-2xl uppercase font-black outline-none"
+                    />
                     {(correctionDrills[idx] || "").toLowerCase() === error.target.toLowerCase() && (
-                      <div className="bg-emerald-500 text-white px-10 py-3 rounded-full font-black text-xl animate-bounce shadow-lg">✓ WORD SECURED!</div>
+                      <div className="bg-emerald-500 text-white px-10 py-3 rounded-full font-black text-xl shadow-lg">✓ SECURED</div>
                     )}
                   </div>
                 ))}
               </div>
-              {/* THE CHANGE: Next Round Button instead of Retry Round */}
-              <button onClick={() => fetchContent(false)} className="w-full py-10 bg-rose-600 text-white rounded-[50px] font-black text-3xl uppercase shadow-2xl hover:bg-rose-700 transition mt-6">Next Round 🚀</button>
+              <button onClick={() => fetchContent(false)} className="w-full py-10 bg-rose-600 text-white rounded-[50px] font-black text-3xl uppercase shadow-2xl mt-6">Next Round 🚀</button>
             </div>
           )}
 
