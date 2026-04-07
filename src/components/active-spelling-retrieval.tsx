@@ -35,41 +35,47 @@ export default function ActiveSpellingRetrieval() {
     return word.toUpperCase().match(/.{1,3}/g)?.join(' - ') || word.toUpperCase();
   };
 
-  // UPDATED: Ensuring word count is committed before moving rounds
+  // HARDENED: This function now clears all old state before fetching
   const fetchContent = async (isNewSession: boolean = false) => {
     setLoading(true);
-    startTime.current = null; // Reset WPM timer for the new sentence
-    setWpm(0);
+    setTargetText(''); // Clear old text so the UI doesn't flicker
     setUserInput('');
+    setFeedback([]);
     setCorrectionDrills({});
     setShowHint(false);
-    
+    startTime.current = null;
+    setWpm(0);
+
     const currentTopic = isNewSession ? selectedTopic : activeTopic;
     if (isNewSession) setActiveTopic(currentTopic);
     
     try {
       const res = await fetch(`https://son-spelling-backend.onrender.com/generate?mode=${mode}&level=${level}&topic=${encodeURIComponent(currentTopic)}`);
+      
+      if (!res.ok) throw new Error("Backend Error");
+      
       const data = await res.json();
-      setTargetText(data.text);
-      setPhase('study');
-      setLoading(false);
+      
+      if (data.text) {
+        setTargetText(data.text);
+        setPhase('study'); // Move to study phase ONLY after we have the text
+      } else {
+        throw new Error("No text received");
+      }
     } catch (err) {
+      console.error(err);
+      alert("Mick, the signal's weak! Try clicking the button again.");
+    } finally {
       setLoading(false);
-      alert("System Down, Mick!");
     }
   };
 
-  // UPDATED: WPM calculation logic to be more reactive
   useEffect(() => {
     if (phase === 'typing' && userInput.length > 0) {
-      if (!startTime.current) {
-        startTime.current = Date.now();
-      }
-      const timeElapsed = (Date.now() - startTime.current) / 60000; // in minutes
+      if (!startTime.current) startTime.current = Date.now();
+      const timeElapsed = (Date.now() - startTime.current) / 60000;
       const wordCount = userInput.trim().split(/\s+/).length;
-      if (timeElapsed > 0.01) { // Prevent infinity on first keystroke
-        setWpm(Math.round(wordCount / timeElapsed));
-      }
+      if (timeElapsed > 0.05) setWpm(Math.round(wordCount / timeElapsed));
     }
   }, [userInput, phase]);
 
@@ -91,8 +97,6 @@ export default function ActiveSpellingRetrieval() {
     });
 
     setFeedback(results);
-    
-    // ALWAYS update words completed based on how many he got right
     const correctCount = results.filter(f => f.status === 'correct').length;
     setWordsCompleted(prev => prev + correctCount);
 
@@ -129,7 +133,9 @@ export default function ActiveSpellingRetrieval() {
               <select value={selectedTopic} onChange={(e) => setSelectedTopic(e.target.value)} className="w-full p-8 text-3xl border-4 border-slate-100 rounded-[30px] font-black bg-slate-50 focus:border-rose-500 outline-none cursor-pointer">
                 {["Soccer", "Basketball", "Sneakers", "Technology", "Space", "Science", "Geography", "History", "Video Games"].map(cat => <option key={cat} value={cat}>{cat}</option>)}
               </select>
-              <button onClick={() => fetchContent(true)} className="w-full py-8 bg-rose-600 text-white rounded-[30px] font-black text-4xl shadow-2xl">RING THE BELL 🔔</button>
+              <button onClick={() => fetchContent(true)} disabled={loading} className="w-full py-8 bg-rose-600 text-white rounded-[30px] font-black text-4xl shadow-2xl">
+                {loading ? "DATA RETRIEVAL..." : "RING THE BELL 🔔"}
+              </button>
             </div>
           )}
 
@@ -144,40 +150,27 @@ export default function ActiveSpellingRetrieval() {
             <div className="flex-grow flex flex-col space-y-6">
               <div className="flex gap-4 justify-center">
                 <button onMouseDown={(e) => { e.preventDefault(); rockySpeak(targetText); }} className="px-10 py-3 bg-blue-100 text-blue-800 rounded-2xl font-black border-2 border-blue-200">🔊 Repeat</button>
-                {/* PEEK: Only shows while button is held down */}
-                <button 
-                    onMouseDown={(e) => { e.preventDefault(); setShowHint(true); }} 
-                    onMouseUp={() => setShowHint(false)}
-                    onMouseLeave={() => setShowHint(false)}
-                    className="px-10 py-3 rounded-2xl font-black border-2 bg-slate-100 text-slate-500 border-slate-200 active:bg-yellow-400 active:text-yellow-900"
-                >
-                    👁️ Hold to Peek
-                </button>
+                <button onMouseDown={(e) => { e.preventDefault(); setShowHint(true); }} onMouseUp={() => setShowHint(false)} onMouseLeave={() => setShowHint(false)} className="px-10 py-3 rounded-2xl font-black border-2 bg-slate-100 text-slate-500 border-slate-200 active:bg-yellow-400">👁️ Hold to Peek</button>
               </div>
-              
               <div className="h-16 flex items-center justify-center">
-                {showHint && <div className="text-center text-4xl font-mono text-indigo-600 font-black bg-yellow-50 px-6 py-2 rounded-2xl border-2 border-yellow-200 animate-pulse">{targetText}</div>}
+                {showHint && <div className="text-center text-4xl font-mono text-indigo-600 font-black bg-yellow-50 px-6 py-2 rounded-2xl border-2 border-yellow-200">{targetText}</div>}
               </div>
-
               <textarea 
-                ref={inputRef}
-                value={userInput} 
-                onChange={(e) => setUserInput(e.target.value)} 
-                autoFocus 
+                ref={inputRef} value={userInput} onChange={(e) => setUserInput(e.target.value)} autoFocus 
                 spellCheck="false" autoComplete="off" autoCorrect="off" autoCapitalize="none"
                 className="flex-grow w-full p-12 text-5xl font-mono border-4 border-slate-50 rounded-[50px] outline-none bg-slate-50 resize-none font-black" 
               />
-              <button onClick={checkWork} className="w-full py-8 bg-indigo-600 text-white rounded-[30px] font-black text-4xl shadow-2xl uppercase tracking-tighter">Finish Round 🎯</button>
+              <button onClick={checkWork} className="w-full py-8 bg-indigo-600 text-white rounded-[30px] font-black text-4xl shadow-2xl uppercase">Finish Round 🎯</button>
             </div>
           )}
 
           {phase === 'debrief' && (
-            <div className="flex-grow flex flex-col space-y-8">
+            <div className="flex-grow flex flex-col space-y-8 animate-in fade-in">
               <h2 className="text-4xl font-black text-rose-600 text-center uppercase italic">The Blueprint Room</h2>
               <div className="grid grid-cols-1 gap-8">
                 {feedback.filter(f => f.status !== 'correct').map((error, idx) => (
                   <div key={idx} className="bg-slate-50 p-10 rounded-[50px] border-4 border-indigo-100 shadow-xl flex flex-col items-center gap-6">
-                    <div className="text-6xl md:text-8xl font-mono font-black text-indigo-900 tracking-[0.1em] bg-white px-12 py-8 rounded-[40px] shadow-inner border-2 border-slate-100 text-center">
+                    <div className="text-6xl md:text-8xl font-mono font-black text-indigo-900 tracking-[0.1em] bg-white px-12 py-8 rounded-[40px] shadow-inner border-2 border-slate-100 text-center uppercase">
                         {getSyllableBreakdown(error.target)}
                     </div>
                     <input 
@@ -186,20 +179,21 @@ export default function ActiveSpellingRetrieval() {
                       spellCheck="false" autoComplete="off" autoCorrect="off" autoCapitalize="none"
                       className="w-full p-8 border-4 border-indigo-500 rounded-[30px] text-center text-5xl font-mono bg-white shadow-2xl uppercase font-black outline-none"
                     />
-                    {(correctionDrills[idx] || "").toLowerCase() === error.target.toLowerCase() && (
-                      <div className="bg-emerald-500 text-white px-10 py-3 rounded-full font-black text-xl shadow-lg">✓ SECURED</div>
-                    )}
                   </div>
                 ))}
               </div>
-              <button onClick={() => fetchContent(false)} className="w-full py-10 bg-rose-600 text-white rounded-[50px] font-black text-3xl uppercase shadow-2xl mt-6">Next Round 🚀</button>
+              <button onClick={() => fetchContent(false)} disabled={loading} className="w-full py-10 bg-rose-600 text-white rounded-[50px] font-black text-3xl uppercase shadow-2xl hover:bg-rose-700 transition mt-6">
+                {loading ? "LOADING NEXT ROUND..." : "Next Round 🚀"}
+              </button>
             </div>
           )}
 
           {phase === 'feedback' && (
             <div className="flex-grow flex flex-col items-center justify-center space-y-12">
               <div className="text-[200px] animate-bounce">🏆</div>
-              <button onClick={() => fetchContent(false)} className="px-24 py-10 bg-rose-600 text-white rounded-full font-black text-4xl shadow-2xl">NEXT MISSION 🚀</button>
+              <button onClick={() => fetchContent(false)} disabled={loading} className="px-24 py-10 bg-rose-600 text-white rounded-full font-black text-4xl shadow-2xl">
+                {loading ? "LOADING..." : "NEXT MISSION 🚀"}
+              </button>
             </div>
           )}
         </div>
