@@ -13,14 +13,11 @@ export default function ActiveSpellingRetrieval() {
   const [loading, setLoading] = useState(false);
   const [showHint, setShowHint] = useState(false);
   const [feedback, setFeedback] = useState<{word: string, target: string, status: 'correct' | 'error' | 'missing'}[]>([]);
-  
-  // FIX: Each word gets its own entry in an object { "wordIndex": "userText" }
   const [correctionDrills, setCorrectionDrills] = useState<Record<number, string>>({});
 
   const [wordsCompleted, setWordsCompleted] = useState(0);
   const [wpm, setWpm] = useState(0);
   const startTime = useRef<number | null>(null);
-  const lastMilestone = useRef(0);
 
   const categories = ["Soccer", "Basketball", "Sneakers", "Technology", "Space", "Science", "Geography", "History", "Video Games"];
 
@@ -34,7 +31,6 @@ export default function ActiveSpellingRetrieval() {
     }
   };
 
-  // TEACHING TOOL: Splits word into 3-letter chunks for visual learning
   const getSyllableBreakdown = (word: string) => {
     return word.match(/.{1,3}/g)?.join('-').toUpperCase() || word.toUpperCase();
   };
@@ -44,7 +40,7 @@ export default function ActiveSpellingRetrieval() {
     startTime.current = null;
     setWpm(0);
     setUserInput('');
-    setCorrectionDrills({}); // Reset drills
+    setCorrectionDrills({});
     const currentTopic = isNewSession ? selectedTopic : activeTopic;
     if (isNewSession) setActiveTopic(currentTopic);
     
@@ -85,8 +81,8 @@ export default function ActiveSpellingRetrieval() {
       rockySpeak("Great round! Perfect form.");
     } else {
       setPhase('debrief');
-      setCorrectionDrills({}); // Clear previous drill inputs
-      rockySpeak("Check the blueprint, kid. Let's rebuild these words.");
+      setCorrectionDrills({});
+      rockySpeak("Check the blueprint, kid. Rebuild these words.");
     }
   };
 
@@ -130,40 +126,52 @@ export default function ActiveSpellingRetrieval() {
                 <button onClick={() => rockySpeak(targetText)} className="px-10 py-3 bg-blue-100 text-blue-800 rounded-2xl font-black border-2 border-blue-200">🔊 Repeat</button>
                 <button onClick={() => setShowHint(!showHint)} className="px-10 py-3 bg-slate-100 text-slate-500 rounded-2xl font-black border-2 border-slate-200">👁️ Peek</button>
               </div>
-              <textarea value={userInput} onChange={(e) => setUserInput(e.target.value)} autoFocus className="flex-grow w-full p-12 text-5xl font-mono border-4 border-slate-50 rounded-[50px] outline-none bg-slate-50 resize-none font-black" placeholder="Start punchin'..." />
+              
+              {/* THE TEXTAREA: AUTOCORRECT DISABLED */}
+              <textarea 
+                value={userInput} 
+                onChange={(e) => setUserInput(e.target.value)} 
+                autoFocus 
+                spellCheck="false"
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="none"
+                className="flex-grow w-full p-12 text-5xl font-mono border-4 border-slate-50 rounded-[50px] outline-none bg-slate-50 resize-none font-black" 
+                placeholder="Start punchin'..." 
+              />
+              
               <button onClick={checkWork} className="w-full py-8 bg-indigo-600 text-white rounded-[30px] font-black text-4xl shadow-2xl uppercase">Finish Round 🎯</button>
             </div>
           )}
 
-          {/* PHASE: DEBRIEF (FIXED MULTI-BOX LOGIC) */}
           {phase === 'debrief' && (
             <div className="flex-grow flex flex-col space-y-6">
-              <h2 className="text-3xl font-black text-rose-600 text-center uppercase italic">Correction Drill: Build it Right</h2>
+              <h2 className="text-3xl font-black text-rose-600 text-center uppercase italic">Correction Drill</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {feedback.filter(f => f.status !== 'correct').map((error, idx) => (
                   <div key={idx} className="bg-slate-50 p-6 rounded-[30px] border-4 border-indigo-50 shadow-md flex flex-col items-center gap-4">
-                    <p className="text-[10px] font-black text-slate-400">You Wrote: <span className="line-through text-rose-500 ml-1">{error.word || "EMPTY"}</span></p>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Blueprint: {getSyllableBreakdown(error.target)}</p>
+                    <div className="text-4xl font-mono font-black text-indigo-900 tracking-widest">{error.target}</div>
                     
-                    {/* SYLLABLE BREAKDOWN DISPLAY */}
-                    <div className="text-xs font-black text-indigo-400 tracking-[0.3em] uppercase">Blueprint:</div>
-                    <div className="text-4xl font-mono font-black text-indigo-900 tracking-widest">{getSyllableBreakdown(error.target)}</div>
-                    
+                    {/* CORRECTION INPUT: AUTOCORRECT DISABLED */}
                     <input 
                       value={correctionDrills[idx] || ""}
                       onChange={(e) => setCorrectionDrills(prev => ({ ...prev, [idx]: e.target.value }))}
+                      spellCheck="false"
+                      autoComplete="off"
+                      autoCorrect="off"
+                      autoCapitalize="none"
                       placeholder="Retype correctly..."
                       className="w-full p-5 border-4 border-white rounded-2xl text-center text-3xl font-mono bg-white shadow-inner uppercase"
                     />
                     
-                    {(correctionDrills[idx] || "").toLowerCase() === error.target.toLowerCase() ? (
+                    {(correctionDrills[idx] || "").toLowerCase() === error.target.toLowerCase() && (
                       <span className="text-emerald-500 font-black animate-bounce text-xs italic">✓ WORD SECURED!</span>
-                    ) : (
-                      <button onClick={() => rockySpeak(error.target, true)} className="text-[10px] text-blue-500 font-bold hover:underline">🔊 Listen to sounds</button>
                     )}
                   </div>
                 ))}
               </div>
-              <button onClick={() => { setPhase('typing'); setUserInput(''); setFeedback([]); setCorrectionDrills({}); }} className="w-full py-8 bg-slate-800 text-white rounded-[40px] font-black text-2xl uppercase shadow-xl mt-4 hover:bg-black transition">Retry Round ↺</button>
+              <button onClick={() => { setPhase('typing'); setUserInput(''); setFeedback([]); setCorrectionDrills({}); }} className="w-full py-8 bg-slate-800 text-white rounded-[40px] font-black text-2xl uppercase shadow-xl mt-4">Retry Round ↺</button>
             </div>
           )}
 
