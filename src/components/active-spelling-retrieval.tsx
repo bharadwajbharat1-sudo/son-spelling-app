@@ -649,18 +649,38 @@ export default function ActiveSpellingRetrieval() {
           {phase === 'typing' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
 
-              {/* Blurred sentence (peek-able) */}
+              {/* Peek-only sentence — truly hidden until held */}
               <div style={{
                 background: '#000', border: '2px solid #1a0800',
                 borderRadius: 8, padding: '12px 16px',
                 fontFamily: 'Share Tech Mono, monospace',
-                fontSize: 16, color: '#333',
+                fontSize: 16,
                 textAlign: 'center', lineHeight: 1.5,
-                filter: showPeek ? 'none' : 'blur(6px)',
-                transition: 'filter 0.2s',
-                userSelect: showPeek ? 'auto' : 'none',
+                position: 'relative', overflow: 'hidden',
+                minHeight: 48,
+                cursor: 'default',
               }}>
-                {targetText}
+                {/* Text is color:transparent + blurred when hidden — truly unreadable */}
+                <span style={{
+                  color: showPeek ? '#fff' : 'transparent',
+                  filter: showPeek ? 'none' : 'blur(8px)',
+                  transition: 'color 0.15s, filter 0.15s',
+                  userSelect: showPeek ? 'auto' : 'none',
+                  display: 'block',
+                }}>
+                  {targetText}
+                </span>
+                {/* Overlay label shown when hidden */}
+                {!showPeek && (
+                  <span style={{
+                    position: 'absolute', inset: 0,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 11, color: '#3d1500', letterSpacing: 2,
+                    fontFamily: 'Oswald, sans-serif', pointerEvents: 'none',
+                  }}>
+                    HOLD PEEK TO REVEAL
+                  </span>
+                )}
               </div>
 
               {/* LIVE word-by-word diff — this is the key feedback */}
