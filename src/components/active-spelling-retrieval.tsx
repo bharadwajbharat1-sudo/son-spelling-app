@@ -39,7 +39,7 @@ function spellOut(word: string) { say(`${word}. ${word.split('').join(', ')}. ${
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 function rand<T>(a: T[]): T { return a[Math.floor(Math.random()*a.length)]; }
-function cw(s: string) { return s.toLowerCase().replace(/[^\w\s]/g,'').trim().split(/\s+/).filter(Boolean); }
+function cw(s: string) { return s.toLowerCase().replace(/[^a-z0-9\s]/gi,'').trim().split(/\s+/).filter(Boolean); }
 function syllabify(w: string): string[] {
   const vowels='aeiouy', word=w.toLowerCase(); let cur=''; const parts:string[]=[];
   for(let i=0;i<word.length;i++){
@@ -51,9 +51,12 @@ function syllabify(w: string): string[] {
   return parts.length>1?parts:[w];
 }
 function diffWord(target:string,typed:string):WordResult['letterDiff'] {
+  // Compare lowercase so capitalisation never counts as wrong — spelling only
+  const tl=target.toLowerCase().replace(/[^a-z0-9]/g,'');
+  const ul=typed.toLowerCase().replace(/[^a-z0-9]/g,'');
   const d:WordResult['letterDiff']=[];
-  for(let i=0;i<Math.max(target.length,typed.length);i++){
-    const t=target[i]??'',u=typed[i]??'';
+  for(let i=0;i<Math.max(tl.length,ul.length);i++){
+    const t=tl[i]??'',u=ul[i]??'';
     if(!t) d.push({char:u,status:'extra'});
     else if(!u) d.push({char:t,status:'missing'});
     else if(t===u) d.push({char:u,status:'correct'});
@@ -552,6 +555,7 @@ export default function RockySpelling() {
         {/* Input */}
         <textarea ref={taRef} value={input}
           onChange={e=>setInput(e.target.value)}
+          onPaste={e=>{e.preventDefault();say("No shortcuts, kid! Type it yourself.",0.8);}}
           onKeyDown={e=>{if(e.key==='Enter'&&e.ctrlKey)check();}}
           autoFocus spellCheck={false} autoComplete="off" autoCorrect="off" autoCapitalize="none"
           placeholder="type the sentence here..."
@@ -769,6 +773,7 @@ export default function RockySpelling() {
           }}>🔊 SPELL IT</button>
           <input ref={wbRef} type="text" value={wbInput}
             onChange={e=>setWbInput(e.target.value)}
+            onPaste={e=>e.preventDefault()}
             onKeyDown={e=>{if(e.key==='Enter')submitTrial();}}
             placeholder="type the word..." spellCheck={false} autoComplete="off" autoCorrect="off" autoCapitalize="none"
             className={wbState==='bad'?'wrong-chip':''}
