@@ -20,7 +20,13 @@ type Stats = {
   mastered: number;
 };
 
-const API = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/$/, "");
+const EXTERNAL_API = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
+const generateUrl = (query: string) =>
+  EXTERNAL_API ? `${EXTERNAL_API}/generate?${query}` : `/api/generate?${query}`;
+const wordInfoUrl = (word: string) =>
+  EXTERNAL_API
+    ? `${EXTERNAL_API}/word-info?word=${encodeURIComponent(word)}`
+    : `/api/word-info?word=${encodeURIComponent(word)}`;
 const REVIEW_AFTER_NEW_WORDS = 3;
 const REQUIRED_CORRECT_REPEATS = 2;
 
@@ -123,7 +129,7 @@ export default function SpellingApp() {
 
   const fetchInfo = async (targetWord: string) => {
     try {
-      const response = await fetch(`${API}/word-info?word=${encodeURIComponent(targetWord)}`);
+      const response = await fetch(wordInfoUrl(targetWord));
       if (!response.ok) throw new Error(`Word information failed (${response.status})`);
       const data = (await response.json()) as WordInfo;
       setInfo({
@@ -155,7 +161,7 @@ export default function SpellingApp() {
     try {
       const shouldReview = reviewQueue.length > 0 && (forceReview || newWordsSinceReview >= REVIEW_AFTER_NEW_WORDS);
       const focus = shouldReview ? `&focus_words=${encodeURIComponent(reviewQueue.join(","))}` : "";
-      const response = await fetch(`${API}/generate?mode=word&level=${level}${focus}`, { cache: "no-store" });
+      const response = await fetch(generateUrl(`mode=word&level=${level}${focus}`), { cache: "no-store" });
       if (!response.ok) throw new Error(`Server returned ${response.status}`);
       const data = await response.json();
       const nextWord = String(data.text || "").trim().toLowerCase();
@@ -172,7 +178,7 @@ export default function SpellingApp() {
       setTimeout(() => speak(nextWord), 180);
     } catch (err) {
       const detail = err instanceof Error ? err.message : "Unknown connection error";
-      setError(`Could not load a word. Check NEXT_PUBLIC_API_URL and the backend. ${detail}`);
+      setError(`Could not load a word. ${detail}`);
       setWord("");
     } finally {
       setLoading(false);
